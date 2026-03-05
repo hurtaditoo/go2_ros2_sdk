@@ -25,6 +25,8 @@ def generate_launch_description():
     # Determine connection mode
     conn_mode = "single" if len(robot_ip_list) == 1 and conn_type != "cyclonedds" else "multi"
     
+    common_ros_args = ['--enclave', enclave]
+
     # Package paths
     package_dir = get_package_share_directory('go2_robot_sdk')
     urdf_file = 'go2.urdf' if conn_mode == 'single' else 'multi_go2.urdf'
@@ -43,6 +45,7 @@ def generate_launch_description():
     print(f"   Connection: {conn_type} ({conn_mode})")
     
     # Launch arguments
+    enclave = LaunchConfiguration('enclave')
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     map_arg = LaunchConfiguration('map')
     with_rviz = LaunchConfiguration('rviz', default='true')
@@ -50,6 +53,7 @@ def generate_launch_description():
     with_joystick = LaunchConfiguration('joystick', default='true')
     
     launch_args = [
+        DeclareLaunchArgument('enclave', default_value='/go2', description='SROS2 enclave for launched nodes'),
         DeclareLaunchArgument(
             'map',
             default_value=map_file,
@@ -72,6 +76,7 @@ def generate_launch_description():
             executable='robot_state_publisher',
             name='go2_robot_state_publisher',
             output='screen',
+            ros_arguments=common_ros_args,
             parameters=[{
                 'use_sim_time': use_sim_time,
                 'robot_description': robot_desc
@@ -83,6 +88,7 @@ def generate_launch_description():
             executable='go2_driver_node',
             name='go2_driver_node',
             output='screen',
+            ros_arguments=common_ros_args,
             parameters=[{
                 'robot_ip': robot_ip,
                 'token': robot_token,
@@ -97,6 +103,7 @@ def generate_launch_description():
             remappings=[
                 ('robot0/point_cloud2', 'point_cloud2'),
             ] if conn_mode == 'single' else [],
+            ros_arguments=common_ros_args,
             parameters=[{
                 'robot_ip_lst': robot_ip_list,
                 'map_name': '3d_map',
@@ -108,6 +115,7 @@ def generate_launch_description():
             package='lidar_processor_cpp',
             executable='pointcloud_aggregator_node',
             name='pointcloud_aggregator',
+            ros_arguments=common_ros_args,
             parameters=[{
                 'max_range': 20.0,
                 'min_range': 0.1,
@@ -126,6 +134,7 @@ def generate_launch_description():
                 ('cloud_in', '/pointcloud/filtered'),
                 ('scan', '/scan'),
             ],
+            ros_arguments=common_ros_args,
             parameters=[{
                 'target_frame': 'base_link',
                 'max_height': 2.0,
@@ -146,6 +155,7 @@ def generate_launch_description():
             package='speech_processor',
             executable='tts_node',
             name='tts_node',
+            ros_arguments=common_ros_args,
             parameters=[{
                 'api_key': os.getenv('ELEVENLABS_API_KEY', ''),
                 'provider': 'elevenlabs',
@@ -163,6 +173,7 @@ def generate_launch_description():
             package='joy',
             executable='joy_node',
             condition=IfCondition(with_joystick),
+            ros_arguments=common_ros_args,
             parameters=[config_paths['joystick']]
         ),
         Node(
@@ -170,6 +181,7 @@ def generate_launch_description():
             executable='teleop_node',
             name='go2_teleop_node',
             condition=IfCondition(with_joystick),
+            ros_arguments=common_ros_args,
             parameters=[config_paths['twist_mux']],
         ),
         Node(
@@ -177,6 +189,7 @@ def generate_launch_description():
             executable='twist_mux',
             output='screen',
             condition=IfCondition(with_joystick),
+            ros_arguments=common_ros_args,
             parameters=[
                 {'use_sim_time': use_sim_time},
                 config_paths['twist_mux']
@@ -193,6 +206,7 @@ def generate_launch_description():
             name='go2_rviz2',
             output='screen',
             arguments=['-d', config_paths['rviz']],
+            ros_arguments=common_ros_args,
             parameters=[{'use_sim_time': False}]
         ),
     ]

@@ -80,6 +80,7 @@ class Go2NodeFactory:
     def create_launch_arguments(self) -> List[DeclareLaunchArgument]:
         """Create all launch arguments"""
         return [
+            DeclareLaunchArgument('enclave', default_value='/go2', description='SROS2 enclave for launched nodes'),
             DeclareLaunchArgument('rviz2', default_value='true', description='Launch RViz2'),
             DeclareLaunchArgument('nav2', default_value='true', description='Launch Nav2'),
             DeclareLaunchArgument('slam', default_value='true', description='Launch SLAM'),
@@ -88,10 +89,16 @@ class Go2NodeFactory:
             DeclareLaunchArgument('teleop', default_value='true', description='Launch teleoperation'),
         ]
     
+    def _get_enclave_ros_args(self):
+        """Common SROS2 enclave arguments for nodes"""
+        enclave = LaunchConfiguration('enclave')
+        return ['--enclave', enclave]
+    
     def create_robot_state_nodes(self) -> List[Node]:
         """Create robot state publisher nodes"""
         nodes = []
         use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+        common_ros_args = self._get_enclave_ros_args()
         
         if self.config.conn_mode == 'single':
             # Single robot configuration
@@ -107,7 +114,8 @@ class Go2NodeFactory:
                         'use_sim_time': use_sim_time,
                         'robot_description': robot_desc
                     }],
-                    arguments=[self.config.config_paths['urdf']]
+                    arguments=[self.config.config_paths['urdf']],
+                    ros_arguments=common_ros_args
                 ),
                 self._create_pointcloud_to_laserscan_node()
             ])
@@ -129,6 +137,7 @@ class Go2NodeFactory:
                             'use_sim_time': use_sim_time,
                             'robot_description': robot_desc
                         }],
+                        ros_arguments=common_ros_args,
                         arguments=[self.config.config_paths['urdf']]
                     ),
                     self._create_pointcloud_to_laserscan_node(f"robot{i}")
@@ -143,6 +152,7 @@ class Go2NodeFactory:
     
     def _create_pointcloud_to_laserscan_node(self, namespace: str = None) -> Node:
         """Create pointcloud to laserscan conversion node"""
+        common_ros_args = self._get_enclave_ros_args()
         if namespace:
             # Multi-robot setup
             return Node(
@@ -153,6 +163,7 @@ class Go2NodeFactory:
                     ('cloud_in', f'{namespace}/point_cloud2'),
                     ('scan', f'{namespace}/scan'),
                 ],
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'target_frame': f'{namespace}/base_link',
                     'max_height': 0.1
@@ -169,6 +180,7 @@ class Go2NodeFactory:
                     ('cloud_in', 'point_cloud2'),
                     ('scan', 'scan'),
                 ],
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'target_frame': 'base_link',
                     'max_height': 0.5
@@ -178,6 +190,8 @@ class Go2NodeFactory:
     
     def create_core_nodes(self) -> List[Node]:
         """Create core Go2 robot nodes"""
+        common_ros_args = self._get_enclave_ros_args()
+
         return [
             # Main robot driver (clean architecture)
             Node(
@@ -185,6 +199,7 @@ class Go2NodeFactory:
                 executable='go2_driver_node',
                 name='go2_driver_node',
                 output='screen',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'robot_ip': self.config.robot_ip,
                     'token': self.config.robot_token,
@@ -196,6 +211,7 @@ class Go2NodeFactory:
                 package='lidar_processor',
                 executable='lidar_to_pointcloud',
                 name='lidar_to_pointcloud',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'robot_ip_lst': self.config.robot_ip_list,
                     'map_name': self.config.map_name,
@@ -207,6 +223,7 @@ class Go2NodeFactory:
                 package='lidar_processor',
                 executable='pointcloud_aggregator',
                 name='pointcloud_aggregator',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'max_range': 20.0,
                     'min_range': 0.1,
@@ -221,6 +238,7 @@ class Go2NodeFactory:
                 package='speech_processor',
                 executable='tts_node',
                 name='tts_node',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'api_key': os.getenv('ELEVENLABS_API_KEY', ''),
                     'provider': 'elevenlabs',
@@ -237,6 +255,7 @@ class Go2NodeFactory:
         use_sim_time = LaunchConfiguration('use_sim_time', default='false')
         with_joystick = LaunchConfiguration('joystick', default='true')
         with_teleop = LaunchConfiguration('teleop', default='true')
+        common_ros_args = self._get_enclave_ros_args()
         
         return [
             # Joystick node
@@ -244,6 +263,7 @@ class Go2NodeFactory:
                 package='joy',
                 executable='joy_node',
                 condition=IfCondition(with_joystick),
+                ros_arguments=common_ros_args,
                 parameters=[self.config.config_paths['joystick']]
             ),
             # Teleop twist joy node
@@ -252,6 +272,7 @@ class Go2NodeFactory:
                 executable='teleop_node',
                 name='go2_teleop_node',
                 condition=IfCondition(with_joystick),
+                ros_arguments=common_ros_args,
                 parameters=[self.config.config_paths['twist_mux']],
             ),
             # Twist multiplexer
@@ -260,6 +281,7 @@ class Go2NodeFactory:
                 executable='twist_mux',
                 output='screen',
                 condition=IfCondition(with_teleop),
+                ros_arguments=common_ros_args,
                 parameters=[
                     {'use_sim_time': use_sim_time},
                     self.config.config_paths['twist_mux']
@@ -270,7 +292,8 @@ class Go2NodeFactory:
     def create_visualization_nodes(self) -> List[Node]:
         """Create visualization nodes (RViz, Foxglove)"""
         with_rviz2 = LaunchConfiguration('rviz2', default='true')
-        
+        common_ros_args = self._get_enclave_ros_args()
+     
         return [
             # RViz2
             Node(
@@ -280,6 +303,7 @@ class Go2NodeFactory:
                 name='go2_rviz2',
                 output='screen',
                 arguments=['-d', self.config.config_paths['rviz']],
+                ros_arguments=common_ros_args,
                 parameters=[{'use_sim_time': False}]
             ),
         ]

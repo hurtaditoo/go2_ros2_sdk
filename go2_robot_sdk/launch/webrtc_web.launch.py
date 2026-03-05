@@ -21,12 +21,17 @@ def load_urdf(context, *args, **kwargs):
     # Create full path to URDF
     urdf_file_path = os.path.join(pkg_dir, 'urdf', urdf_file_name)
 
+    # Get enclave from context and prepare common ROS arguments
+    enclave = context.launch_configurations.get('enclave', '/go2')
+    common_ros_args = ['--enclave', enclave]
+
     # Robot state publisher node
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='webrtc_robot_state_publisher',
         output='screen',
+        ros_arguments=common_ros_args,
         parameters=[{
             'robot_description': ParameterValue(
                 Command(['cat ', urdf_file_path]),
@@ -51,9 +56,17 @@ def generate_launch_description():
         'elevenlabs_api_key', default=EnvironmentVariable(
             'ELEVENLABS_API_KEY', default_value=''))
     voice_name = LaunchConfiguration('voice_name', default='default')
+    enclave = LaunchConfiguration('enclave')
+
+    common_ros_args = ['--enclave', enclave]
 
     return LaunchDescription([
         # Declare launch arguments
+        DeclareLaunchArgument(
+            'enclave',
+            default_value='/go2',
+            description='SROS2 enclave for launched nodes'
+        ),
         DeclareLaunchArgument(
             'robot_ip',
             default_value=os.getenv('ROBOT_IP', os.getenv('GO2_IP', '')),
@@ -103,6 +116,7 @@ def generate_launch_description():
             Node(
                 package='go2_robot_sdk',
                 executable='go2_driver_node',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'robot_ip': robot_ip,
                     'token': '',
@@ -135,6 +149,7 @@ def generate_launch_description():
                 executable='republish',
                 name='image_republisher',
                 arguments=['raw', 'compressed'],
+                ros_arguments=common_ros_args,
                 remappings=[
                     ('in', 'camera/image_raw'),
                     ('out/compressed', 'camera/compressed'),
@@ -146,6 +161,7 @@ def generate_launch_description():
             Node(
                 package='foxglove_bridge',
                 executable='foxglove_bridge',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'send_buffer_limit': send_buffer_limit
                 }],
@@ -158,6 +174,7 @@ def generate_launch_description():
                 package='go2_robot_sdk',
                 executable='tts_node',
                 name='tts_node',
+                ros_arguments=common_ros_args,
                 parameters=[{
                     'elevenlabs_api_key': elevenlabs_api_key,
                     'voice_name': voice_name
