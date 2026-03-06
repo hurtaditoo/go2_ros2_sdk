@@ -8,7 +8,7 @@ from launch import LaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, SetEnvironmentVariable
 from launch.launch_description_sources import FrontendLaunchDescriptionSource, PythonLaunchDescriptionSource
 
 
@@ -22,8 +22,6 @@ def generate_launch_description():
     map_name = os.getenv('MAP_NAME', 'my_map')
     save_map = os.getenv('MAP_SAVE', 'true')
     conn_type = os.getenv('CONN_TYPE', 'webrtc')
-
-    common_ros_args = ['--enclave', enclave]
     
     # Determine connection mode
     conn_mode = "single" if len(robot_ip_list) == 1 and conn_type != "cyclonedds" else "multi"
@@ -52,6 +50,13 @@ def generate_launch_description():
     with_rviz = LaunchConfiguration('rviz', default='true')
     with_foxglove = LaunchConfiguration('foxglove', default='true')
     with_joystick = LaunchConfiguration('joystick', default='true')
+
+    common_ros_args = ['--enclave', enclave]
+
+    enclave_env = SetEnvironmentVariable(
+        name='ROS_SECURITY_ENCLAVE_OVERRIDE',
+        value=enclave
+    )
     
     launch_args = [
         DeclareLaunchArgument('enclave', default_value='/go2', description='SROS2 enclave for launched nodes'),
@@ -234,6 +239,7 @@ def generate_launch_description():
     
     return LaunchDescription(
         launch_args +
+        [enclave_env] +
         core_nodes +
         teleop_nodes +
         viz_nodes +

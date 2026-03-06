@@ -8,7 +8,7 @@ from launch import LaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, SetEnvironmentVariable
 from launch.launch_description_sources import FrontendLaunchDescriptionSource, PythonLaunchDescriptionSource
 
 
@@ -88,7 +88,10 @@ class Go2NodeFactory:
             DeclareLaunchArgument('joystick', default_value='true', description='Launch joystick'),
             DeclareLaunchArgument('teleop', default_value='true', description='Launch teleoperation'),
         ]
-    
+    def create_security_env(self):
+        enclave = LaunchConfiguration('enclave')
+        return [SetEnvironmentVariable('ROS_SECURITY_ENCLAVE_OVERRIDE', enclave)]
+
     def _get_enclave_ros_args(self):
         """Common SROS2 enclave arguments for nodes"""
         enclave = LaunchConfiguration('enclave')
@@ -367,10 +370,12 @@ def generate_launch_description():
     teleop_nodes = factory.create_teleop_nodes()
     visualization_nodes = factory.create_visualization_nodes()
     include_launches = factory.create_include_launches()
+    security_env = factory.create_security_env()
     
     # Combine all elements
     launch_entities = (
         launch_args +
+        security_env +
         robot_state_nodes +
         core_nodes +
         teleop_nodes +
