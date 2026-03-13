@@ -8,7 +8,7 @@ from launch import LaunchDescription
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
-from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument, SetEnvironmentVariable
+from launch.actions import IncludeLaunchDescription, DeclareLaunchArgument
 from launch.launch_description_sources import FrontendLaunchDescriptionSource, PythonLaunchDescriptionSource
 
 
@@ -24,7 +24,9 @@ def generate_launch_description():
     
     # Determine connection mode
     conn_mode = "single" if len(robot_ip_list) == 1 and conn_type != "cyclonedds" else "multi"
-        
+    
+    common_ros_args = ['--enclave', enclave]
+
     # Package paths
     package_dir = get_package_share_directory('go2_robot_sdk')
     urdf_file = 'go2.urdf' if conn_mode == 'single' else 'multi_go2.urdf'
@@ -49,13 +51,7 @@ def generate_launch_description():
     with_rviz = LaunchConfiguration('rviz', default='true')
     with_foxglove = LaunchConfiguration('foxglove', default='true')
     with_joystick = LaunchConfiguration('joystick', default='true')
-
-    common_ros_args = ['--enclave', enclave]
-    enclave_env = SetEnvironmentVariable(
-        name='ROS_SECURITY_ENCLAVE_OVERRIDE',
-        value=enclave
-    )
-
+    
     launch_args = [
         DeclareLaunchArgument('enclave', default_value='/go2', description='SROS2 enclave for launched nodes'),
         DeclareLaunchArgument(
@@ -254,7 +250,6 @@ def generate_launch_description():
     
     return LaunchDescription(
         launch_args +
-        [enclave_env] +
         core_nodes +
         teleop_nodes +
         viz_nodes +
